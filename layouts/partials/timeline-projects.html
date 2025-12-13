@@ -1,0 +1,28 @@
+<section class="timeline">
+    <div class="timeline-items">
+    
+    {{ range .projects }}
+        {{ $repo := . }}
+        {{ $title := printf "<a href='%s' target='_blank' rel='noopener'>%s</a>" $repo.html_url $repo.name }}
+        {{ $subtitle := printf "%s | ⭐ %d | 🍴 %d" $repo.language $repo.stargazers_count $repo.forks_count }}
+        
+        <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-date">
+                {{ dateFormat "Jan 2006" $repo.updated_at }}
+            </div>
+            <div class="timeline-content">
+                <h2>{{ $title | safeHTML }}</h2>
+                <div class="subtitle">{{ $subtitle }}</div>
+                <p>{{ $repo.description | default "No description provided." }}</p>
+                
+                {{/* Optional: Add a button/link to the repo */}}
+                <a href="{{ $repo.html_url }}" target="_blank" rel="noopener" class="button button-primary">
+                    View on GitHub
+                </a>
+            </div>
+        </div>
+    {{ end }}
+    
+    </div>
+</section>

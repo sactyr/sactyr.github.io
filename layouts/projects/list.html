@@ -7,49 +7,10 @@
         </div>
     </header>
 
-    <div class="row projects-grid">
+    <div class="projects-timeline">
     
     {{ if site.Data.projects }}
-        {{ range site.Data.projects }}
-        {{ $repo := . }}
-
-        <div class="project-card">
-            <div class="card-body">
-                <h2 class="card-title">
-                    <a href="{{ $repo.html_url }}" target="_blank" rel="noopener noreferrer">
-                        {{ $repo.name }}
-                    </a>
-                </h2>
-                {{ with $repo.description }}
-                <p class="card-text">{{ . }}</p>
-                {{ else }}
-                <p class="card-text text-muted">No description provided.</p>
-                {{ end }}
-            </div>
-            
-            <div class="card-footer">
-                <ul class="meta-list">
-                    {{ with $repo.language }}
-                    <li class="meta-item language-tag">
-                        <i class="fas fa-code"></i> {{ . }}
-                    </li>
-                    {{ end }}
-                    
-                    <li class="meta-item">
-                        <i class="fas fa-star"></i> {{ $repo.stargazers_count }} Stars
-                    </li>
-                    
-                    <li class="meta-item">
-                        <i class="fas fa-code-branch"></i> {{ $repo.forks_count }} Forks
-                    </li>
-                    
-                    <li class="meta-item update-time">
-                        Last Updated: {{ dateFormat "January 2, 2006" $repo.updated_at }}
-                    </li>
-                </ul>
-            </div>
-        </div>
-        {{ end }}
+        {{ partial "timeline.html" (dict "context" . "projects" site.Data.projects) }}
     {{ else }}
         <div class="alert alert-warning" role="alert">
             No public GitHub projects found or the data action has not run yet.

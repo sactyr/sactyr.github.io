@@ -7,6 +7,8 @@ on:
 
 jobs:
   deploy:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     env:
       HUGO_VERSION: 0.152.2 # Check your local Hugo version and update if needed

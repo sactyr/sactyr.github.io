@@ -6,22 +6,5 @@
             {{ .Content }}
         </div>
     </header>
-
-    <div class="projects-timeline">
-    
-    {{ if site.Data.projects }}
-        {{ partial "projects-shortcode-generator.html" (dict "context" . "projects" site.Data.projects) }}
-        
-        {{ $timelineCode := .Scratch.Get "finalTimeline" }}
-
-        {{ $timelineCode | markdownify | safeHTML }}
-
-    {{ else }}
-        <div class="alert alert-warning" role="alert">
-            No public GitHub projects found or the data action has not run yet.
-        </div>
-    {{ end }}
-
-    </div>
 </div>
 {{ end }}

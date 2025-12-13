@@ -6,3 +6,5 @@ draft: false
 ---
 
 Below is a list of my active public repositories, pulled directly from my GitHub profile. This list is updated automatically via GitHub Actions!
+
+{{< projects_timeline >}}

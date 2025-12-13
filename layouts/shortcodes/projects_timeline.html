@@ -1,0 +1,11 @@
+{{ $page := .Page }}
+
+{{ if $page.Site.Data.projects }}
+    {{ partial "projects-shortcode-generator.html" (dict "context" $page "projects" $page.Site.Data.projects) }}
+    
+    {{ $timelineCode := $page.Scratch.Get "finalTimeline" }}
+
+    {{ $timelineCode | $page.RenderString }}
+{{ else }}
+    <p>No public GitHub projects found.</p>
+{{ end }}

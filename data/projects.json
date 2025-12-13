@@ -1,0 +1,32 @@
+[
+  {
+    "name": "sactyr.github.io",
+    "full_name": "sactyr/sactyr.github.io",
+    "html_url": "https://github.com/sactyr/sactyr.github.io",
+    "description": "Personal Blog, made with Hugo & Blowfish",
+    "language": "HTML",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "updated_at": "2025-12-13T02:57:57Z"
+  },
+  {
+    "name": "crypto_trading",
+    "full_name": "sactyr/crypto_trading",
+    "html_url": "https://github.com/sactyr/crypto_trading",
+    "description": "Fully automated crypto trading bot in R",
+    "language": "R",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "updated_at": "2025-12-11T08:22:19Z"
+  },
+  {
+    "name": "noise_generator",
+    "full_name": "sactyr/noise_generator",
+    "html_url": "https://github.com/sactyr/noise_generator",
+    "description": "Generate white and pink noise programatically",
+    "language": "R",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "updated_at": "2025-05-12T07:14:46Z"
+  }
+]

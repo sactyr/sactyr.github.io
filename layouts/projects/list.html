@@ -10,7 +10,7 @@
     <div class="projects-timeline">
     
     {{ if site.Data.projects }}
-        {{ partial "timeline-projects.html" (dict "context" . "projects" site.Data.projects) }}
+        {{ partial "projects-shortcode-generator.html" (dict "context" . "projects" site.Data.projects) }}
     {{ else }}
         <div class="alert alert-warning" role="alert">
             No public GitHub projects found or the data action has not run yet.

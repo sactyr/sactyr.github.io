@@ -1,0 +1,20 @@
+{{ $page := .context }}
+
+{{ range .projects }}
+    {{ $repo := . }}
+    
+    {{ $title := printf "<a href='%s' target='_blank' rel='noopener'>%s</a>" $repo.html_url $repo.name }}
+    {{ $subtitle := printf "%s | ⭐ %d | 🍴 %d" $repo.language $repo.stargazers_count $repo.forks_count }}
+    {{ $date := dateFormat "2006-01-02" $repo.updated_at }}
+    
+    {{ $content := printf "%s\n\n[View on GitHub](%s)" ($repo.description | default "No description provided.") $repo.html_url }}
+    
+    {{ $shortcode := printf "\n{{< timelineItem title=\"%s\" subtitle=\"%s\" date=\"%s\" >}}\n%s\n{{< /timelineItem >}}\n" $title $subtitle $date $content }}
+    
+    {{ $page.Scratch.Add "timelineItems" $shortcode }}
+{{ end }}
+
+{{ if $page.Scratch.Get "timelineItems" }}
+    {{ $finalShortcode := printf "{{< timeline >}}%s{{< /timeline >}}" ($page.Scratch.Get "timelineItems") }}
+    {{ $page.Scratch.Set "finalTimeline" $finalShortcode }}
+{{ end }}

@@ -26,14 +26,14 @@ jobs:
           script: |
             // Use the GitHub REST API to fetch public repos for the user
             const response = await github.rest.repos.listForUser({
-              username: 'sactyr'
+              username: 'sactyr', 
               type: 'public',
               sort: 'updated',
               direction: 'desc',
-              per_page: 100 // Fetch up to 100 repos
+              per_page: 100
             });
             
-            // Extract the relevant data and write it to the file
+            // Extract the relevant data fields for Hugo to consume
             const projectsData = response.data.map(repo => ({
               name: repo.name,
               full_name: repo.full_name,
@@ -42,11 +42,14 @@ jobs:
               language: repo.language,
               stargazers_count: repo.stargazers_count,
               forks_count: repo.forks_count,
-              updated_at: repo.updated_at
+              updated_at: repo.updated_at,
+              # You can add more fields if needed, like repo.pushed_at or repo.homepage
             }));
             
-            // Save the data as JSON to the Hugo data directory
+            // Save the data as JSON to the Hugo data directory (data/projects.json)
             const fs = require('fs');
+            // Ensure the data directory exists before writing
+            fs.mkdirSync('data', { recursive: true });
             fs.writeFileSync('data/projects.json', JSON.stringify(projectsData, null, 2));
 
       - name: Commit and Push Updated Data File

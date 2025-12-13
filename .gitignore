@@ -1,0 +1,12 @@
+.Rproj.user
+*.Rproj
+.Rhistory
+.RData
+.Ruserdata
+.Rprofile
+
+# Hugo output
+public/
+
+# Temporary files
+.hugo_build.lock

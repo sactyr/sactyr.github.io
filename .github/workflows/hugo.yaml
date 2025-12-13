@@ -55,7 +55,6 @@ jobs:
           committer_name: 'GitHub Actions Bot'
           committer_email: 'github-actions[bot]@users.noreply.github.com'
           default_author: github_actions
-          branch: main
           
   deploy:
     # This job builds the site and pushes the output to the gh-pages branch

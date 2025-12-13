@@ -14,7 +14,17 @@
         
         {{ $timelineCode := .Scratch.Get "finalTimeline" }}
 
-        {{ $timelineCode | renderString }}
+        {{ $fileContext := dict "context" . "content" $timelineCode "filename" "temp_projects_timeline.md" }}
+        {{ partial "data-file-writer.html" $fileContext }}
+
+        {{ $writtenFile := .Scratch.Get "writtenFile" }}
+        {{ with $writtenFile }}
+            {{ .Content }}
+        {{ else }}
+            <div class="alert alert-danger" role="alert">
+                Error: Could not render timeline content.
+            </div>
+        {{ end }}
 
     {{ else }}
         <div class="alert alert-warning" role="alert">

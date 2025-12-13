@@ -1,0 +1,8 @@
+{{ $content := .content }}
+{{ $filename := .filename }}
+{{ $dataDir := "data" }}
+{{ $filePath := path.Join $dataDir $filename }}
+
+{{ if $content }}
+  {{ $content | resources.FromString $filePath | .context.Page.Scratch.Set "writtenFile" }}
+{{ end }}

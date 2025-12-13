@@ -3,17 +3,15 @@
 {{ range .projects }}
     {{ $repo := . }}
 
-    {{ $title := printf "<a href='%s' target='_blank' rel='noopener'>%s</a>" $repo.html_url $repo.name }}
+    {{ $githubShortcode := printf "{{< github repo=\"%s\" >}}" $repo.full_name }}
 
-    {{ $stars := int $repo.stargazers_count }}
-    {{ $forks := int $repo.forks_count }}
-
-    {{ $subtitle := printf "%s | ⭐ %d | 🍴 %d" $repo.language $stars $forks }}
+    {{ $header := printf "<a href='%s' target='_blank' rel='noopener'>%s</a>" $repo.html_url $repo.name }}
+    {{ $subtitle := printf "%s | ⭐ %d | 🍴 %d" $repo.language (int $repo.stargazers_count) (int $repo.forks_count) }}
     {{ $date := dateFormat "2006-01-02" $repo.updated_at }}
     
-    {{ $content := printf "%s\n\n[View on GitHub](%s)" ($repo.description | default "No description provided.") $repo.html_url }}
+    {{ $content := printf "%s\n%s" $subtitle $githubShortcode }}
     
-    {{ $shortcode := printf "\n{{< timelineItem title=\"%s\" subtitle=\"%s\" date=\"%s\" >}}\n%s\n{{< /timelineItem >}}\n" $title $subtitle $date $content }}
+    {{ $shortcode := printf "\n{{< timelineItem title=\"%s\" date=\"%s\" >}}\n%s\n{{< /timelineItem >}}\n" $header $date $content }}
     
     {{ $page.Scratch.Add "timelineItems" $shortcode }}
 {{ end }}

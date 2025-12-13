@@ -2,9 +2,13 @@
 
 {{ range .projects }}
     {{ $repo := . }}
-    
+
     {{ $title := printf "<a href='%s' target='_blank' rel='noopener'>%s</a>" $repo.html_url $repo.name }}
-    {{ $subtitle := printf "%s | ⭐ %d | 🍴 %d" $repo.language $repo.stargazers_count $repo.forks_count }}
+
+    {{ $stars := int $repo.stargazers_count }}
+    {{ $forks := int $repo.forks_count }}
+
+    {{ $subtitle := printf "%s | ⭐ %d | 🍴 %d" $repo.language $stars $forks }}
     {{ $date := dateFormat "2006-01-02" $repo.updated_at }}
     
     {{ $content := printf "%s\n\n[View on GitHub](%s)" ($repo.description | default "No description provided.") $repo.html_url }}

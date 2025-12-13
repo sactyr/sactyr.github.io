@@ -1,31 +1,68 @@
-name: Deploy Hugo Site to GitHub Pages
+name: Hugo Blog Deploy and Project Data Update
 
 on:
   push:
     branches:
       - main
 
+# Define two jobs: fetch_data (to get repo list) and deploy (to build and publish)
 jobs:
-  deploy:
+
+  fetch_data:
+    # This job fetches data from GitHub and pushes it back to the source branch
+    runs-on: ubuntu-latest
     permissions:
       contents: write
+    
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Ensure full history is available for subsequent actions
+
+      - name: Fetch GitHub Repos and Save to Data File
+        uses: benc-uk/workflow-dispatch-repository-data@v1
+        with:
+          user: sactyr
+          output_file: 'data/projects.json'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          visibility: public
+
+      - name: Commit and Push Updated Data File
+        # This step commits the newly created data/projects.json file to the 'main' branch
+        uses: EndBug/add-and-commit@v9
+        with:
+          add: 'data/projects.json'
+          message: 'chore: Update projects data from GitHub API'
+          committer_name: 'GitHub Actions Bot'
+          committer_email: 'github-actions[bot]@users.noreply.github.com'
+          default_author: github_actions
+          branch: main
+          
+  deploy:
+    # This job builds the site and pushes the output to the gh-pages branch
+    needs: fetch_data # Ensure this job runs ONLY after the project data is updated
     runs-on: ubuntu-latest
+    permissions:
+      contents: write 
+      pages: write 
+      id-token: write 
+
     env:
-      HUGO_VERSION: 0.152.2 # Check your local Hugo version and update if needed
+      HUGO_VERSION: 0.152.2 
       THEME_DIR: themes/blowfish
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          # This line was removed: submodules: true
-          fetch-depth: 0 # Keep this for deployment stability
+          fetch-depth: 0 
 
       - name: Set up Hugo
         uses: peaceiris/actions-hugo@v3
         with:
           hugo-version: ${{ env.HUGO_VERSION }}
-          extended: true # Needed for SCSS/SASS processing
+          extended: true
 
       - name: Build Hugo Site
         run: hugo --minify
@@ -35,4 +72,4 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./public
-          publish_branch: gh-pages # This branch will hold the generated static site
+          publish_branch: gh-pages # The branch GitHub Pages serves from

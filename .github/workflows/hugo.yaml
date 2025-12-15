@@ -20,7 +20,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch GitHub Repos and Save to Data File
+    - name: Fetch GitHub Repos and Save to Data File
         uses: actions/github-script@v7
         with:
           script: |
@@ -35,12 +35,8 @@ jobs:
             const projectsData = response.data.map(repo => ({
               name: repo.name,
               full_name: repo.full_name,
-              html_url: repo.html_url,
-              description: repo.description,
-              language: repo.language,
-              stargazers_count: repo.stargazers_count,
-              forks_count: repo.forks_count,
-              updated_at: repo.updated_at
+              // The shortcode needs the full name and updated date for the badge/sort
+              updated_at: repo.updated_at 
             }));
             
             const fs = require('fs');

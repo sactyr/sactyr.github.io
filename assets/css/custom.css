@@ -1,0 +1,10 @@
+/*
+This CSS sets the maximum width of the GitHub card component to 450px.
+The containing element's width is now managed by removing 'flex-1' 
+in the layouts/shortcodes/timelineItem.html override.
+*/
+
+.github-card-wrapper {
+    max-width: 450px !important;
+    display: block; /* Ensures reliable containment */
+}

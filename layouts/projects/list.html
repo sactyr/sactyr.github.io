@@ -1,10 +1,12 @@
 {{ define "main" }}
 <div class="container py-5">
     <header>
-        <h1>{{ .Title }}</h1>
-        <div class="content">
+        <h1 class="mt-5 text-4xl font-extrabold text-neutral-900 dark:text-neutral">{{ .Title }}</h1>
+        
+        <div class="prose dark:prose-invert max-w-full">
             {{ .Content }}
         </div>
+        
     </header>
 </div>
 {{ end }}

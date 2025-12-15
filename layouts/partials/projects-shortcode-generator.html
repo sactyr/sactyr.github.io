@@ -5,13 +5,13 @@
 
     {{ $githubShortcode := printf "{{< github repo=\"%s\" >}}" $repo.full_name }}
 
-    {{ $header := printf "<a href='%s' target='_blank' rel='noopener'>%s</a>" $repo.html_url $repo.name }}
-    {{ $subtitle := printf "%s | ⭐ %d | 🍴 %d" $repo.language (int $repo.stargazers_count) (int $repo.forks_count) }}
+    {{ $header := $repo.name }}
+
+    {{ $badgeDate := dateFormat "January 2006" $repo.updated_at }}
+
     {{ $date := dateFormat "2006-01-02" $repo.updated_at }}
     
-    {{ $content := printf "%s\n%s" $subtitle $githubShortcode }}
-    
-    {{ $shortcode := printf "\n{{< timelineItem title=\"%s\" date=\"%s\" >}}\n%s\n{{< /timelineItem >}}\n" $header $date $content }}
+    {{ $shortcode := printf "\n{{< timelineItem header=\"%s\" date=\"%s\" icon=\"github\" badge=\"%s\" >}}\n%s\n{{< /timelineItem >}}\n" $header $date $badgeDate $githubShortcode }}
     
     {{ $page.Scratch.Add "timelineItems" $shortcode }}
 {{ end }}

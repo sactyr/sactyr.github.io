@@ -2,7 +2,7 @@ disabled = false
 languageCode = "en"
 languageName = "English"
 weight = 1
-title = ""
+title = "Naga's Personal Blog"
 
 [params]
   displayName = "EN"
@@ -11,7 +11,7 @@ title = ""
   dateFormat = "2 January 2006"
   # logo = "img/logo.png"
   # secondaryLogo = "img/secondary-logo.png"
-  # description = "My awesome website"
+  description = "Personal blog of Naga Karuppiah"
   # copyright = "Copy, _right?_ :thinking_face:"
 
 [params.author]

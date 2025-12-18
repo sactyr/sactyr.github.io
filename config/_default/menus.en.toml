@@ -68,7 +68,7 @@
 
 [[footer]]
   name = "Privacy"
-  pageRef = "Privacy"
+  pageRef = "privacy"
   weight = 10
   
 

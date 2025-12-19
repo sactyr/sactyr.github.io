@@ -154,7 +154,7 @@ To make the chart more intuitive, we map the point size to the CAPS Score - the 
 
 ![](images/clipboard-4045907531.png)
 
-Here is the output for the top 5 (by CAPS) algorithms:  
+Here is the output for the top 5 (by CAPS) algorithms:
 
 ```{r echo=FALSE, eval=TRUE}
 ranked_summary <- structure(list(strategy_type = c("sma_cross", "macd", "macd", 
@@ -175,12 +175,15 @@ ranked_summary <- structure(list(strategy_type = c("sma_cross", "macd", "macd",
 
 knitr::kable(ranked_summary)
 ```
-  
+
 Based on the table above, we can conclude SMA Crossover with a 10% stop loss is the most suitable strategy that is consistent, and manages both risk and return well.
 
+You may find the entire backtesting code [here](https://github.com/sactyr/crypto_trading/tree/master/R/backtesting).
+
 ## What's Next?
-We now have a trading strategy.  
+
+We now have a trading strategy.
 
 In Part 2, we will dive into creating a trading bot: moving from historical data to live trading data.
 
-Stay tuned—the maths is done, now it is time to build the machine.
+Stay tuned - the maths is done, now it is time to build the machine.

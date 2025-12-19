@@ -155,7 +155,7 @@ To make the chart more intuitive, we map the point size to the CAPS Score - the 
 
 ![](images/clipboard-4045907531.png)
 
-Here is the output for the top 5 (by CAPS) algorithms:  
+Here is the output for the top 5 (by CAPS) algorithms:
 
 
 |strategy_type | stop_loss| geo_mean_CAGR| win_rate_windows| median_Sharpe| cvar_drawdown| n_samples| robust_calmar| prob_score|      CAPS|
@@ -166,12 +166,15 @@ Here is the output for the top 5 (by CAPS) algorithms:
 |macd          |      0.05|     0.5062554|            0.981|       0.93435|      0.539100|      1000|     0.9390752|  0.9165974| 0.8607538|
 |buy_hold      |      0.00|     0.7889268|            0.979|       0.85025|      0.823200|      1000|     0.9583659|  0.8323947| 0.7977387|
 |macd          |      0.02|     0.4829502|            0.988|       0.94685|      0.569642|      1000|     0.8478136|  0.9354878| 0.7931192|
-  
+
 Based on the table above, we can conclude SMA Crossover with a 10% stop loss is the most suitable strategy that is consistent, and manages both risk and return well.
 
+You may find the entire backtesting code [here](https://github.com/sactyr/crypto_trading/tree/master/R/backtesting).
+
 ## What's Next?
-We now have a trading strategy.  
+
+We now have a trading strategy.
 
 In Part 2, we will dive into creating a trading bot: moving from historical data to live trading data.
 
-Stay tuned—the maths is done, now it is time to build the machine.
+Stay tuned - the maths is done, now it is time to build the machine.

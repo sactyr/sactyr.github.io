@@ -61,6 +61,7 @@ forgejoDefaultServer = "https://v11.next.forgejo.org"
   disableHeroImageFilter = false # only used when layout equals hero
 
 [article]
+  showComments = true
   showDate = true
   showViews = false
   showLikes = false
@@ -91,7 +92,6 @@ forgejoDefaultServer = "https://v11.next.forgejo.org"
   showWordCount = true
   # sharingLinks = [ "linkedin", "twitter", "bluesky", "mastodon", "reddit", "pinterest", "facebook", "email", "whatsapp", "telegram", "line"]
   showZenMode = false
-  showComments = true
 
 [comments]
   engine = "giscus"
@@ -107,7 +107,7 @@ forgejoDefaultServer = "https://v11.next.forgejo.org"
     inputPosition = "bottom"
     theme = "preferred_color_scheme"
     lang = "en"
-    
+
 [list]
   showHero = false
   # heroStyle = "background" # valid options: basic, big, background, thumbAndBackground

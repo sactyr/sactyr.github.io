@@ -91,7 +91,23 @@ forgejoDefaultServer = "https://v11.next.forgejo.org"
   showWordCount = true
   # sharingLinks = [ "linkedin", "twitter", "bluesky", "mastodon", "reddit", "pinterest", "facebook", "email", "whatsapp", "telegram", "line"]
   showZenMode = false
+  showComments = true
 
+[comments]
+  engine = "giscus"
+  [comments.giscus]
+    repo = "sactyr/sactyr.github.io"
+    repoId = "R_kgDOQn1PnA"
+    category = "Announcements"
+    categoryId = "DIC_kwDOQn1PnM4C0B-E"
+    mapping = "pathname"
+    strict = 0
+    reactionsEnabled = 1
+    emitMetadata = 0
+    inputPosition = "bottom"
+    theme = "preferred_color_scheme"
+    lang = "en"
+    
 [list]
   showHero = false
   # heroStyle = "background" # valid options: basic, big, background, thumbAndBackground

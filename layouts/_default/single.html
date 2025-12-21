@@ -14,7 +14,7 @@
     {{ end }}
 
     {{/* Header */}}
-    <header id="single_header" class="mt-5 max-w-prose">
+    <header id="single_header" class="mt-5 max-w-full">
       {{ if .Params.showBreadcrumbs | default (site.Params.article.showBreadcrumbs | default false) }}
         {{ partial "breadcrumbs.html" . }}
       {{ end }}
@@ -46,9 +46,9 @@
       {{ end }}
 
 
-      <div class="min-w-0 min-h-0 max-w-fit">
+      <div class="min-w-0 min-h-0 flex-1">
         {{ partial "series/series.html" . }}
-        <div class="article-content max-w-prose mb-20">
+        <div class="article-content max-w-full mb-20">
           {{ .Content }}
           {{ partial "comments.html" . }}
           {{ $defaultReplyByEmail := site.Params.replyByEmail }}
@@ -91,20 +91,8 @@
     </section>
 
     {{/* Footer */}}
-    <footer class="pt-8 max-w-prose print:hidden">
+    <footer class="pt-8 max-w-full print:hidden">
       {{ partial "article-pagination.html" . }}
-      {{ if .Params.showComments | default (site.Params.article.showComments | default false) }}
-        {{ if templates.Exists "partials/comments.html" }}
-          <div class="pt-3">
-            <hr class="border-dotted border-neutral-300 dark:border-neutral-600">
-            <div class="pt-3">
-              {{ partial "comments.html" . }}
-            </div>
-          </div>
-        {{ else }}
-          {{ warnf "[BLOWFISH] Comments are enabled for %s but no comments partial exists." .File.Path }}
-        {{ end }}
-      {{ end }}
     </footer>
   </article>
 {{ end }}

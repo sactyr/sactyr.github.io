@@ -1,0 +1,646 @@
+---
+title: 'Building an Automated Crypto Trader Part 2: Automating Crypto Price Collection with R and Azure'
+author: ''
+date: '2026-02-11'
+slug: []
+categories:
+  - Deep Dives
+tags:
+  - Algo-Trading
+  - R
+  - Crypto
+  - Azure
+  - Cloud
+  - Automation
+  - Data Pipeline
+description: "Building a production-grade automated system to fetch and store Bitcoin price data from Independent Reserve using R and Azure Container Instances"
+draft: false
+---
+
+
+
+## Introduction
+
+In my [previous post on backtesting crypto trading strategies](https://sactyr.github.io/posts/2025-12-19-building-an-automated-crypto-trader-part-1-survival-of-the-fittest-backtesting/), I developed a simple moving average crossover strategy for trading Bitcoin. However, backtesting is only half the equation — to actually trade, you need **reliable, up-to-date price data**. 
+
+Manual data collection is error-prone and unsustainable for algorithmic trading. This post walks through how I built a fully automated system to fetch hourly Bitcoin (BTC-AUD) price data from the [Independent Reserve](https://www.independentreserve.com/au) exchange and deploy it to Azure for 24/7 operation.
+
+**What we'll cover:**
+
+- How the price fetching mechanism works in R
+- Data validation and deduplication techniques
+- Deploying R code to Azure Container Instances
+- Setting up automated hourly scheduling
+- Cost optimization strategies
+
+By the end, you'll have a blueprint for building your own cloud-based crypto data pipeline.
+
+---
+
+## Why Automate Price Collection?
+
+For any algorithmic trading system, you need:
+
+1. **Consistent data collection** - No gaps in your historical record
+2. **Reliability** - System runs 24/7 without manual intervention  
+3. **Real-time updates** - Fresh data for trading decisions
+4. **Validation** - Ensure data quality before using it
+
+Manual collection fails on all these fronts. An automated cloud-based system solves these problems while keeping costs minimal (~$6-7/month for hourly data collection).
+
+---
+
+## The Architecture
+
+Here's the high-level architecture of the system:
+
+```
+┌─────────────────┐
+│  Azure Logic    │──── Triggers every hour at :05
+│     Apps        │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│   Container     │──── Runs R script
+│   Instance      │
+└────────┬────────┘
+         │
+         ├──────► Independent Reserve API (fetch prices)
+         │
+         └──────► Azure Blob Storage (read/write data)
+```
+
+**Key components:**
+
+- **Azure Container Instances**: Runs our R script on-demand
+- **Azure Blob Storage**: Stores historical price data and logs
+- **Azure Logic Apps**: Triggers the container every hour
+- **Managed Identity**: Secure authentication (no hardcoded credentials)
+
+---
+
+## Part 1: The R Price Fetching Mechanism
+
+### Connecting to Independent Reserve API
+
+Independent Reserve provides a public API for historical trade data. Here's the core function:
+
+
+``` r
+#' Get hourly historical price summary from Independent Reserve
+get_price_history <- function(
+    pri_curr_code
+    ,sec_curr_code
+    ,number_of_past_hours = 240
+    ,ir_pub_api_url
+) {
+  
+  url <- file.path(ir_pub_api_url, "GetTradeHistorySummary")
+  
+  # Build the request
+  req <- request(url) %>% 
+    req_url_query(
+      primaryCurrencyCode = pri_curr_code
+      ,secondaryCurrencyCode = sec_curr_code
+      ,numberOfHoursInThePastToRetrieve = number_of_past_hours
+    ) %>% 
+    req_retry(max_tries = 3)
+  
+  # Perform the request
+  resp <- req_perform(req)
+  
+  # Handle response 
+  if (resp_status(resp) == 200) {
+    data_raw <- resp_body_json(resp)
+    
+    # Process into tibble format
+    data <- data_raw$HistorySummaryItems %>%  
+      map_dfr(as_tibble) %>% 
+      mutate(
+        across(
+          .cols = c(StartTimestampUtc, EndTimestampUtc)
+          ,.fns = ~convert_utc_aest(utc_dttm = .x)
+        )
+        ,dttm_updated = Sys.time()
+      ) %>% 
+      rename(
+        sttm_aest = StartTimestampUtc
+        ,edtm_aest = EndTimestampUtc
+      )
+    
+    return(data)
+  } else {
+    stop(paste("Failed to retrieve price history. Status:", resp_status(resp)))
+  }
+}
+```
+
+**Key design decisions:**
+
+1. **API limits**: Independent Reserve allows fetching up to 240 hours (10 days) of data per request
+2. **Timezone handling**: Convert UTC timestamps to AEST immediately for consistency
+3. **Retry logic**: Automatically retry up to 3 times if the API is busy
+4. **Error handling**: Stop execution if the request fails (logged for debugging)
+
+### Timezone Conversion
+
+All timestamps from Independent Reserve come in UTC. Since I'm trading in Canberra, converting to Australian Eastern time immediately prevents timezone confusion:
+
+
+``` r
+convert_utc_aest <- function(utc_dttm) {
+  utc_time <- ymd_hms(utc_dttm, tz = "UTC")
+  with_tz(utc_time, "Australia/Sydney")
+}
+```
+
+This handles both AEST and AEDT (daylight saving) automatically.
+
+### Data Validation and Deduplication
+
+The trickiest part of this system is **merging new data with existing historical data** while ensuring:
+
+- No duplicate rows
+- No missing hours (gaps in data)
+- Data integrity
+
+Here's how I solve this:
+
+**1. MD5 Hashing for Deduplication**
+
+Each row gets a unique MD5 hash based on all its values (except the update timestamp):
+
+
+``` r
+data <- data %>%
+  unite(
+    col = "temp_concat"
+    ,-dttm_updated
+    ,remove = FALSE
+  ) %>%  
+  mutate(md5_hash = md5(temp_concat)) %>% 
+  select(-temp_concat)
+```
+
+Why MD5? If Independent Reserve ever corrects historical data (e.g., fixes a trade volume error), the hash will change and we'll detect it. This prevents both duplicates and allows updates.
+
+**2. Smart Merging**
+
+The merge function identifies new rows by comparing MD5 hashes:
+
+
+``` r
+merge_price_history <- function(
+    pri_curr_code
+    ,sec_curr_code
+    ,ir_pub_api_url
+    ,base_df
+) {
+  
+  # Fetch last 240 hours from API
+  delta_df <- get_price_history(
+    pri_curr_code = pri_curr_code
+    ,sec_curr_code = sec_curr_code
+    ,ir_pub_api_url = ir_pub_api_url
+    ,number_of_past_hours = 240
+  )
+  
+  # Find new rows based on MD5 hashes
+  diff_rows_md5 <- setdiff(delta_df$md5_hash, base_df$md5_hash)
+  
+  if (length(diff_rows_md5) > 0) {
+    log_info("Found ", length(diff_rows_md5), " additional price history rows")
+    
+    # Extract and merge new rows
+    diff_df <- delta_df %>% 
+      filter(md5_hash %in% diff_rows_md5)
+    
+    merged_df <- base_df %>% 
+      bind_rows(diff_df)
+    
+    # Validate completeness...
+    return(merged_df)
+  } else {
+    log_info("No new rows detected")
+    return(NULL)
+  }
+}
+```
+
+**3. Gap Detection**
+
+After merging, we validate that there are no missing hours:
+
+
+``` r
+# Generate expected hourly sequence
+missing_row <- tibble(
+  sttm_aest = seq(
+    min(merged_df$sttm_aest)
+    ,floor_date(lubridate::now() - hours(1), unit = "hours")
+    ,by = "hour"
+  )
+) %>%
+  left_join(merged_df, by = "sttm_aest") %>% 
+  filter(if_any(.cols = -sttm_aest, .fns = ~(is.na(.x))))
+
+if (nrow(missing_row) > 1) {
+  log_error("Missing rows found in price history. Requires manual investigation")
+  stop()
+}
+```
+
+This ensures data integrity — if there's a gap (e.g., the API was down), the script stops and sends an alert rather than silently producing incomplete data.
+
+---
+
+## Part 2: Azure Deployment
+
+### Why Azure?
+
+I chose Azure over other cloud providers for several reasons:
+
+1. **Managed Identity**: Azure's Managed Identity is simpler than GCP's service accounts
+2. **Container Instances**: Pay-per-execution model (no always-on costs)
+3. **Logic Apps**: Visual workflow designer for scheduling
+4. **Cost**: Running hourly costs ~$0.50/month for compute
+
+### Prerequisites
+
+Before deploying, you'll need:
+
+- Azure account (free tier available)
+- Docker Desktop installed
+- Azure CLI installed
+- R 4.5+ with required packages
+
+### Step 1: Containerize Your R Code
+
+Create a `Dockerfile` in your project root:
+
+```dockerfile
+# Use Rocker R base image with R 4.5.2
+FROM rocker/r-ver:4.5.2
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libxml2-dev \
+    libsodium-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy R scripts
+COPY R/ /app/R/
+
+# Install R packages
+RUN R -e "install.packages(c('httr2', 'jsonlite', 'dplyr', 'tidyr', \
+  'lubridate', 'logger', 'openssl', 'AzureStor', 'AzureAuth', \
+  'purrr', 'readr', 'stringr'), repos='https://cran.rstudio.com/')"
+
+# Set environment variables
+ENV CRYPTO_TRADING_FOLDER=/app
+ENV AZURE_CONTAINER_INSTANCE=true
+
+# Run the script
+CMD ["Rscript", "/app/R/crypto_get_price_history.R"]
+```
+
+**Key points:**
+
+- Base image: `rocker/r-ver:4.5.2` ensures consistent R version
+- System dependencies: Required for packages like `httr2` and `openssl`
+- Environment variables: Tell the script it's running in Azure (not locally)
+
+### Step 2: Azure Resource Setup
+
+Create the necessary Azure resources:
+
+```bash
+# Login to Azure
+az login
+
+# Set variables
+RESOURCE_GROUP="crypto-trading-rg"
+LOCATION="australiaeast"  # Sydney data center
+STORAGE_ACCOUNT="cryptobtcaud2025"  # Must be globally unique
+CONTAINER_NAME="crypto-data"
+SUBSCRIPTION_ID=$(az account show --query id --output tsv)
+
+# Create resource group
+az group create \
+  --name $RESOURCE_GROUP \
+  --location $LOCATION
+
+# Create storage account
+az storage account create \
+  --name $STORAGE_ACCOUNT \
+  --resource-group $RESOURCE_GROUP \
+  --location $LOCATION \
+  --sku Standard_LRS
+
+# Create blob container
+az storage container create \
+  --name $CONTAINER_NAME \
+  --account-name $STORAGE_ACCOUNT \
+  --auth-mode login
+```
+
+### Step 3: Build and Push Docker Image
+
+Create a container registry and push your image:
+
+```bash
+# Create Azure Container Registry
+REGISTRY_NAME="cryptotradingregistry"
+
+az acr create \
+  --name $REGISTRY_NAME \
+  --resource-group $RESOURCE_GROUP \
+  --location $LOCATION \
+  --sku Basic
+
+# Enable admin access
+az acr update --name $REGISTRY_NAME --admin-enabled true
+
+# Login
+az acr login --name $REGISTRY_NAME
+
+# Build image
+docker build -t $REGISTRY_NAME.azurecr.io/crypto-price-fetcher:latest .
+
+# Push to registry
+docker push $REGISTRY_NAME.azurecr.io/crypto-price-fetcher:latest
+```
+
+### Step 4: Deploy Container Instance
+
+Deploy your containerized R code:
+
+```bash
+# Get registry password
+REGISTRY_PASSWORD=$(az acr credential show \
+  --name $REGISTRY_NAME \
+  --query "passwords[0].value" \
+  --output tsv)
+
+# Create container instance
+az container create \
+  --resource-group $RESOURCE_GROUP \
+  --name crypto-price-fetcher \
+  --image $REGISTRY_NAME.azurecr.io/crypto-price-fetcher:latest \
+  --registry-login-server $REGISTRY_NAME.azurecr.io \
+  --registry-username $REGISTRY_NAME \
+  --registry-password $REGISTRY_PASSWORD \
+  --cpu 1 \
+  --memory 1.5 \
+  --os-type Linux \
+  --restart-policy Never \
+  --environment-variables \
+    AZURE_STORAGE_ACCOUNT=$STORAGE_ACCOUNT \
+    AZURE_CONTAINER_NAME=$CONTAINER_NAME \
+  --assign-identity [system]
+```
+
+**Important settings:**
+
+- `--restart-policy Never`: Container runs once and stops (we'll trigger it hourly)
+- `--assign-identity [system]`: Creates a Managed Identity for secure authentication
+- Environment variables: Tell the R script which Azure storage to use
+
+### Step 5: Grant Storage Permissions
+
+The container needs permission to read/write to Blob Storage:
+
+```bash
+# Get container's Managed Identity principal ID
+PRINCIPAL_ID=$(az container show \
+  --resource-group $RESOURCE_GROUP \
+  --name crypto-price-fetcher \
+  --query identity.principalId \
+  --output tsv)
+
+# Grant Storage Blob Data Contributor role
+az role assignment create \
+  --assignee $PRINCIPAL_ID \
+  --role "Storage Blob Data Contributor" \
+  --scope /subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$STORAGE_ACCOUNT
+```
+
+### Step 6: Set Up Hourly Scheduling
+
+Use Azure Logic Apps to trigger the container every hour:
+
+1. Go to **Azure Portal** → Create **Logic App**
+2. Choose **Consumption** plan
+3. In the designer, add a **Recurrence** trigger:
+   - Interval: `1`
+   - Frequency: `Day`
+   - Time zone: `AUS Eastern Standard Time`
+   - Schedule hours: `[0,1,2,...,23]`
+   - Schedule minutes: `[5]`
+
+4. Add an **HTTP** action:
+   - Method: `POST`
+   - URI: `https://management.azure.com/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.ContainerInstance/containerGroups/crypto-price-fetcher/start?api-version=2023-05-01`
+   - Authentication: `Managed Identity`
+   - Audience: `https://management.azure.com/`
+
+5. Enable the Logic App's Managed Identity and grant it permissions:
+
+```bash
+# Get Logic App principal ID
+LOGIC_APP_PRINCIPAL_ID=$(az resource show \
+  --resource-group $RESOURCE_GROUP \
+  --name crypto-price-fetcher-scheduler \
+  --resource-type Microsoft.Logic/workflows \
+  --query identity.principalId \
+  --output tsv)
+
+# Grant Contributor role on container
+az role assignment create \
+  --assignee $LOGIC_APP_PRINCIPAL_ID \
+  --role "Contributor" \
+  --scope /subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ContainerInstance/containerGroups/crypto-price-fetcher
+```
+
+Now the system runs automatically every hour at 5 minutes past (00:05, 01:05, 02:05, etc.).
+
+---
+
+## Authentication: Local vs Cloud
+
+One elegant aspect of this setup is how authentication works differently in local vs cloud environments:
+
+
+``` r
+# Detect environment
+is_azure <- Sys.getenv("AZURE_CONTAINER_INSTANCE") != "" || 
+            Sys.getenv("WEBSITE_INSTANCE_ID") != ""
+
+# Set timezone for Azure (containers default to UTC)
+if (is_azure) {
+  Sys.setenv(TZ = "Australia/Sydney")
+}
+
+# Authenticate
+get_azure_container <- function(is_azure_cloud = FALSE) {
+  
+  if (!is_azure_cloud) {
+    # LOCAL: Use connection string from .Renviron
+    conn_str <- Sys.getenv("AZURE_STORAGE_CONNECTION_STRING")
+    creds <- parse_azure_connection(conn_str)
+    
+    blob_endpoint <- blob_endpoint(
+      endpoint = creds$endpoint
+      ,key = creds$account_key
+    )
+    
+  } else {
+    # AZURE CLOUD: Use Managed Identity (no credentials needed)
+    token_url <- "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://storage.azure.com/"
+    
+    token_response <- httr2::request(token_url) %>%
+      httr2::req_headers("Metadata" = "true") %>%
+      httr2::req_perform() %>%
+      httr2::resp_body_json()
+    
+    access_token <- token_response$access_token
+    
+    blob_endpoint <- blob_endpoint(
+      endpoint = paste0("https://", Sys.getenv("AZURE_STORAGE_ACCOUNT"), ".blob.core.windows.net/")
+      ,token = access_token
+    )
+  }
+  
+  container_name <- Sys.getenv("AZURE_CONTAINER_NAME")
+  container <- storage_container(blob_endpoint, container_name)
+  
+  return(container)
+}
+```
+
+**Local development**: Use a connection string stored in `.Renviron`
+
+**Azure cloud**: Use the container's Managed Identity to get a token from Azure's metadata service — no secrets needed!
+
+---
+
+## Logging and Monitoring
+
+### Structured Logging
+
+The R script logs all activities:
+
+
+``` r
+log_info("--- GETTING HISTORICAL PRICES START ---")
+log_info("Running on ", if (is_azure) "Azure" else "Local machine")
+log_success("Retrieved xbt_aud_price_history.rds [Rows: ", nrow(base_history), "]")
+log_info("Found ", length(diff_rows_md5), " additional price history rows")
+log_success("Price history update cycle complete.")
+log_info("--- GETTING HISTORICAL PRICES END ---")
+```
+
+Logs are uploaded to Azure Blob Storage:
+
+```
+logs/
+  crypto_get_price_history/
+    2026-02-07/
+      get_price_history_log.log
+    2026-02-08/
+      get_price_history_log.log
+```
+
+### Email Alerts
+
+I've configured the Logic App to send email alerts on failures:
+
+1. Add a **Send an email** action (Outlook/Gmail)
+2. Configure it to run only when the HTTP action **fails**
+3. Include error details and timestamp in AEDT
+
+This way, I get notified immediately if something breaks.
+
+
+---
+
+## Cost Breakdown
+
+Here's what this system actually costs per month:
+
+| Service | Cost | Notes |
+|---------|------|-------|
+| Container Instances | ~$0.50 | 720 executions × ~2 seconds each |
+| Blob Storage | ~$0.20 | Small data files + logs |
+| Logic App | ~$0.60 | 720 workflow executions |
+| Container Registry | ~$5.00 | Basic tier (stores Docker image) |
+| **Total** | **~$6.30/month** | |
+
+**Cost optimization tips:**
+
+1. **Delete the registry between updates**: Since the container pulls the image on each start, you need to keep the registry. However, if you're not updating code frequently, you could delete it temporarily (saves $5/month), then recreate it when needed.
+
+2. **Use Azure's free tier**: New Azure accounts get $200 credit for 30 days, which covers months of operation.
+
+3. **Reduce execution time**: The faster your R script runs, the less you pay. Profile your code and optimize bottlenecks.
+
+For comparison, running this on a always-on VM would cost $20-50/month. The serverless approach saves 80-90%.
+
+
+---
+
+## Lessons Learned
+
+### 1. Timezone Headaches
+
+Initially, I didn't set the timezone in Azure containers, so all logs showed UTC timestamps. Adding this one line fixed it:
+
+
+``` r
+if (is_azure) Sys.setenv(TZ = "Australia/Sydney")
+```
+
+Now all timestamps are in AEDT/AEST, making debugging much easier.
+
+### 2. MD5 Hashing is Essential
+
+My first version used simple timestamp-based deduplication. This failed when Independent Reserve corrected historical data (they occasionally fix erroneous trades). MD5 hashing detects both duplicates AND changes to existing rows.
+
+### 3. Managed Identity Propagation
+
+Azure role assignments can take 1-2 minutes to propagate. After granting permissions, wait before testing, or you'll get mysterious 403 errors.
+
+---
+
+## Next Steps
+
+This price collection system is the foundation for my trading bot. The next steps are:
+
+1. **Build the trading execution script** - Use the same Azure architecture to execute trades based on signals
+2. **Implement monitoring dashboards** - Azure Application Insights for real-time metrics
+3. **Add data quality checks** - Detect anomalies (e.g., price spikes due to API errors)
+
+The beauty of this architecture is that it's **modular**—I can add new containers for different tasks (backtesting, signal generation, trade execution) all communicating via Blob Storage.
+
+---
+
+## Conclusion
+
+Building an automated crypto data pipeline taught me several valuable lessons:
+
+- **Cloud-native R is viable**: With containers, R works great in production
+- **Serverless saves money**: Pay-per-execution beats always-on VMs
+- **Data validation is critical**: Never trust API data blindly
+- **Azure Managed Identity is elegant**: No secrets management needed
+
+The entire system costs less than a Netflix subscription while providing reliable, validated hourly data for algorithmic trading.
+
+If you're building similar systems, I hope this guide saves you the trial-and-error I went through. The full code is available on [GitHub](https://github.com/sactyr/crypto_trading) (coming soon).
+
+**Have questions or suggestions?** Leave a comment or reach out on [LinkedIn](https://linkedin.com/in/nagakaruppiah).

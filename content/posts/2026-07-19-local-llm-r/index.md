@@ -11,7 +11,7 @@ tags:
   - Ollama
   - self-hosting
 description: "Setting up a local LLM pipeline in R with Ollama, comparing two hardware-fit CLI tools (llmfit vs llm-checker), and two real bugs that ate more time than the setup itself."
-draft: true
+draft: false
 ---
 
 I wanted a local LLM pipeline I could call from R - no cloud API keys, no
